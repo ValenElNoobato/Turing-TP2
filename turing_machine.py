@@ -48,52 +48,55 @@ class TuringMachine:
         if block == "L":  # Mover a la izquierda
             self.head_position -= 1
             if self.head_position < 0:
-                self.head_position = 0  # Asegurar que no salga por la izquierda
+                self.head_position = 0
         elif block == "R":  # Mover a la derecha
             self.head_position += 1
             if self.head_position >= len(self.tape):
-                self.tape.append("_")  # Añadir un espacio en blanco si se sale de los límites
+                self.tape.append("_")
         elif block.startswith("X"):  # Escritura dinámica
-            self.tape[self.head_position] = block[1:]  # Escribir el símbolo en la posición actual
-        elif block.startswith("L_"):  # Desplazar a la izquierda hasta encontrar X
-            target = block[2:]
-            while True:
-                self.head_position -= 1
-                if self.head_position < 0:
-                    self.tape.insert(0, "_")  # Expande la cinta hacia la izquierda
-                    self.head_position = 0
-                    # Notificar a la interfaz sobre la expansión
-                    if self.tape_update_callback:
-                        self.tape_update_callback(self.tape, self.head_position)
-                if self.tape[self.head_position] == target:
-                    break
+            self.tape[self.head_position] = block[1:]
         elif block.startswith("R_"):  # Desplazar a la derecha hasta encontrar X
             target = block[2:]
             while True:
-                self.head_position += 1
+                self.execute_block("R")  # Mover a la derecha paso a paso
+                # Si estamos fuera del límite, expandir dinámicamente la cinta
                 if self.head_position >= len(self.tape):
-                    self.tape.append("_")  # Expande la cinta hacia la derecha
-                    # Notificar a la interfaz sobre la expansión
-                    if self.tape_update_callback:
-                        self.tape_update_callback(self.tape, self.head_position)
+                    self.tape.append("_")
+                # Detenerse si encuentra el símbolo objetivo
                 if self.tape[self.head_position] == target:
                     break
-        elif block.startswith("S_l"):  # Desplazar una cadena hacia la izquierda
-            blank_index = self.tape[self.head_position:].index("_")
-            for i in range(blank_index, self.head_position, -1):
-                self.tape[i] = self.tape[i - 1]
-            self.tape[self.head_position] = "_"
-        elif block.startswith("S_r"):  # Desplazar una cadena hacia la derecha
-            blank_index = self.tape[:self.head_position].index("_")
-            for i in range(blank_index, self.head_position):
+        elif block.startswith("L_"):  # Desplazar a la izquierda hasta encontrar X
+            target = block[2:]  # Extrae el carácter objetivo
+            while True:
+                # Reutilizar el bloque básico "L"
+                self.execute_block("L")
+                
+                # Si estamos fuera del límite izquierdo, expandir la cinta
+                if self.head_position <= 0:
+                    self.tape.insert(0, "_")  # Añadir un espacio vacío al inicio
+                    self.head_position = 0  # Reposicionar el cabezal al nuevo espacio vacío
+                    
+                # Detenerse si encuentra el símbolo objetivo
+                if self.tape[self.head_position] == target:
+                    break
+        elif block == "S_l":  # Desplazar a la izquierda los elementos a la derecha del puntero
+            for i in range(self.head_position, len(self.tape) - 1):
                 self.tape[i] = self.tape[i + 1]
-            self.tape[self.head_position] = "_"
-        else:
-            raise ValueError(f"Bloque desconocido: {block}")
+            self.tape.pop()  # Eliminar el último elemento
 
-        # Notificar a la interfaz sobre la actualización de la cinta
-        if self.tape_update_callback:
-            self.tape_update_callback(self.tape, self.head_position)
+            # Si el cabezal está fuera de los límites, agregar un espacio vacío
+            if self.head_position >= len(self.tape):
+                self.tape.append("_")
+        elif block == "S_r":  # Desplazar a la derecha los elementos a la izquierda del puntero
+            for i in range(self.head_position, 0, -1):
+                self.tape[i] = self.tape[i - 1]
+            self.tape.pop(0)  # Eliminar el primer elemento
+            self.head_position -= 1  # Ajustar el puntero
+
+            # Si el cabezal está fuera de los límites, agregar un espacio vacío
+            if self.head_position < 0:
+                self.tape.insert(0, "_")
+                self.head_position = 0
 
     def shift_left(self):
         """Desplaza a la izquierda la cadena desde la posición actual hasta el primer espacio."""

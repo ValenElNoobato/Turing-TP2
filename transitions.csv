@@ -1,3 +1,7 @@
-tape,01011
-start,0,R_0,state0
-state0,0,S_l,halt
+tape,0123456
+start,0,S_l,state1
+state1,1,S_r,state2
+state2,_,S_r,state3
+state3,_,R_6,state4
+state4,6,S_l,state5
+state5,_,R,halt
