@@ -1,4 +1,3 @@
 tape,01011
-start,0,R_1,state0
-state0,1,R_1,state1
-state1,1,S_l,halt
+start,0,R_0,state0
+state0,0,S_l,halt

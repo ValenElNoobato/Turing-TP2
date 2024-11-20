@@ -56,15 +56,26 @@ class TuringMachine:
         elif block.startswith("X"):  # Escritura dinámica
             self.tape[self.head_position] = block[1:]  # Escribir el símbolo en la posición actual
         elif block.startswith("L_"):  # Desplazar a la izquierda hasta encontrar X
-            target = block[2:]  # Extrae el carácter objetivo 'x'
-            while self.head_position > 0:
+            target = block[2:]
+            while True:
                 self.head_position -= 1
+                if self.head_position < 0:
+                    self.tape.insert(0, "_")  # Expande la cinta hacia la izquierda
+                    self.head_position = 0
+                    # Notificar a la interfaz sobre la expansión
+                    if self.tape_update_callback:
+                        self.tape_update_callback(self.tape, self.head_position)
                 if self.tape[self.head_position] == target:
                     break
         elif block.startswith("R_"):  # Desplazar a la derecha hasta encontrar X
-            target = block[2:]  # Extrae el carácter objetivo 'x'
-            while self.head_position < len(self.tape) - 1:
+            target = block[2:]
+            while True:
                 self.head_position += 1
+                if self.head_position >= len(self.tape):
+                    self.tape.append("_")  # Expande la cinta hacia la derecha
+                    # Notificar a la interfaz sobre la expansión
+                    if self.tape_update_callback:
+                        self.tape_update_callback(self.tape, self.head_position)
                 if self.tape[self.head_position] == target:
                     break
         elif block.startswith("S_l"):  # Desplazar una cadena hacia la izquierda
@@ -160,9 +171,3 @@ class TuringMachine:
     def set_tape_update_callback(self, callback):
         self.tape_update_callback = callback
 
-"
-Bien ahora creo que funciona perfecto esos bloques. Por otro lado, recordando que la cinta es infinita, estaba pensando que si yo hacia "R__", es decir, hacer la instruccion R hasta encontrar un espacio vacio que es lo que estaria luego de todos los elementos de la cinta, deberia de ampliarse la cinta para que ahora el cabezal este fuera de la cinta. No se si me explico, por lo que te dare un ejemplo: si yo tengo la cinta "0011" y el bloque que se ejecuta es "R__" entonces el cabezal deberia estar en la quinta posicion, es decir:
-0011_
-        ^
-Esto deberia funcionar tanto para "R_" como para "L_". Tambien ten encuenta que supongamos que si tuviera la lista "0011_1" y estoy en el primer 0, y hago "R__" deberia de llevarme al "_" que esta en la cinta, mientras que si vuelvo a ejecutar "R__" deberia de llevarme a la derecha del ultimo 1 de la cinta
-"

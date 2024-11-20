@@ -178,17 +178,17 @@ class TuringMachineGUI:
 
     def update_tape_visual(self, tape, head_position):
         """Actualiza la cinta visual en la interfaz."""
-        for i, label in enumerate(self.tape_labels):
-            if i < len(tape):
-                label.config(text=tape[i])
-            else:
-                label.config(text="_")  # Espacios en blanco
+        # Limpiar etiquetas actuales
+        for label in self.tape_labels:
+            label.destroy()
+        self.tape_labels = []
 
-            # Destacar la posición del cabezal
-            if i == head_position:
-                label.config(bg="yellow")
-            else:
-                label.config(bg="white")
+        # Crear etiquetas para la cinta actualizada
+        for i, symbol in enumerate(tape):
+            bg_color = "yellow" if i == head_position else "white"
+            label = tk.Label(self.tape_frame, text=symbol, font=("Arial", 16), width=2, borderwidth=2, relief="solid", bg=bg_color)
+            label.grid(row=0, column=i, padx=2, pady=2)
+            self.tape_labels.append(label)
 
     def update_head_position(self):
         """Destaca la posición del cabezal en la cinta."""
