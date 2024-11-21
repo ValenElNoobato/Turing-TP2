@@ -24,6 +24,8 @@ class TuringMachineGUI:
         self.transitions = {}
         self.blocks = self.load_blocks("blocks.csv")
         self.halted = False
+        self.auto_stepping = False  # Controla si el avance automático está activo
+        self.auto_speed = 5000  # Intervalo en milisegundos para el avance automático
 
         self.tape_labels = []
         self.create_tape_display()
@@ -32,9 +34,17 @@ class TuringMachineGUI:
         self.step_button = tk.Button(self.root, text="Siguiente Paso", command=self.execute_step)
         self.step_button.grid(row=2, column=0, sticky="ew", pady=10)  # Expandirse horizontalmente
 
+        # Botón para avanzar automáticamente
+        self.auto_button = tk.Button(self.root, text="Avanzar Automáticamente", command=self.start_auto_step)
+        self.auto_button.grid(row=2, column=1, sticky="ew", pady=10)
+
+        # Botón para avanzar rápidamente
+        self.fast_button = tk.Button(self.root, text="Avanzar Rápido", command=self.start_fast_step)
+        self.fast_button.grid(row=2, column=3, sticky="ew", pady=10)
+
         # Botón para cargar un archivo CSV
         self.load_csv_button = tk.Button(self.root, text="Cargar CSV de Transiciones", command=self.load_csv)
-        self.load_csv_button.grid(row=1, column=0, pady=10, sticky="ew")
+        self.load_csv_button.grid(row=1, column=1, pady=10, sticky="ew")
 
         self.turing_machine.set_tape_update_callback(self.update_tape_visual)
 
@@ -46,14 +56,25 @@ class TuringMachineGUI:
         )
         if file_path:
             try:
-                self.transitions, self.tape = self.load_csv_as_dict(file_path)
-                self.head_position = 0  # Reiniciar el cabezal
+                # Cargar datos desde el archivo CSV
+                self.transitions, self.tape, self.head_position = self.load_csv_as_dict(file_path)
                 self.current_state = "start"  # Estado inicial predeterminado
                 self.halted = False  # Reiniciar estado de detención
+
+                # Sincronizar con la máquina de Turing
+                self.turing_machine.set_initial_state(self.current_state)
+                self.turing_machine.set_tape(self.tape)
+                self.turing_machine.set_transitions(self.transitions)
+                self.turing_machine.head_position = self.head_position
+
+                # Actualizar la interfaz
                 self.update_ui_after_load()
-                self.turing_machine.set_initial_state("start")  # Configura el estado inicial
-                self.turing_machine.set_tape(self.tape)        # Configura la cinta inicial
-                self.turing_machine.set_transitions(self.transitions)  # Configura las transiciones
+
+                # Habilitar todos los botones
+                self.step_button.config(state="normal")
+                self.auto_button.config(state="normal")
+                self.fast_button.config(state="normal")
+
                 self.state_label.config(text="Archivo cargado con éxito. ¡Listo para ejecutar!")
             except Exception as e:
                 self.state_label.config(text=f"Error al cargar CSV: {str(e)}")
@@ -62,18 +83,33 @@ class TuringMachineGUI:
         """Carga un archivo CSV como un diccionario y extrae la cinta inicial si está definida."""
         transitions = {}
         tape = []  # Por defecto, cinta vacía
+        initial_symbol = None
+
         with open(filepath, mode="r", newline="") as file:
             reader = csv.reader(file)
             for row in reader:
                 if row[0] == "tape":
                     # Leer la cinta inicial
                     tape = list(row[1])
-                else:
-                    # Leer las transiciones
+                elif not initial_symbol and row[0] != "tape":
+                    # Establecer el símbolo inicial solo si es la primera transición
+                    initial_symbol = row[1]
+                    # Procesar como transición
                     key = (row[0], row[1])
                     value = (row[2], row[3])
                     transitions[key] = value
-        return transitions, tape
+                else:
+                    # Leer las transiciones restantes
+                    key = (row[0], row[1])
+                    value = (row[2], row[3])
+                    transitions[key] = value
+
+        # Imprimir las transiciones cargadas para verificar
+        print("Transiciones cargadas:", transitions)
+
+        # Determinar la posición inicial del cabezal
+        head_position = tape.index(initial_symbol) if initial_symbol in tape else 0
+        return transitions, tape, head_position
 
     def update_ui_after_load(self):
         """Actualiza la interfaz después de cargar un archivo CSV."""
@@ -81,9 +117,8 @@ class TuringMachineGUI:
         self.clear_tape_display()
         self.create_tape_display()
 
-        # Reiniciar la posición del cabezal
-        self.head_position = 0
-        self.update_head_position()
+        # Configurar la posición inicial del cabezal
+        self.update_tape_visual(self.tape, self.head_position)
 
         # Habilitar el botón de avance
         self.step_button.config(state="normal")
@@ -100,7 +135,7 @@ class TuringMachineGUI:
         """Crea o actualiza la representación visual de la cinta."""
         # Crear un nuevo frame para la cinta
         self.tape_frame = tk.Frame(self.root)
-        self.tape_frame.grid(row=0, column=0, sticky="nsew")  # Asegurar que ocupe toda la celda del grid
+        self.tape_frame.grid(row=0, column=1, sticky="nsew")  # Asegurar que ocupe toda la celda del grid
 
         # Crear etiquetas para cada elemento de la cinta
         for i, symbol in enumerate(self.tape):
@@ -122,37 +157,37 @@ class TuringMachineGUI:
         # Actualizar o crear la etiqueta del estado
         if not hasattr(self, 'state_label'):
             self.state_label = tk.Label(self.root, text=f"Estado: {self.current_state}", font=("Arial", 14), anchor="center")
-            self.state_label.grid(row=3, column=0, sticky="ew", pady=10)
+            self.state_label.grid(row=3, column=1, sticky="ew", pady=10)
         else:
             self.state_label.config(text=f"Estado: {self.current_state}")
 
-    def execute_step(self):
-        """Ejecuta un paso de la máquina de Turing."""
+    def execute_step(self, stop_automation=True):
+        """Ejecuta un paso de la máquina de Turing y detiene la automatización si se indica."""
+        # Detener el avance automático solo si se activa explícitamente
+        if stop_automation and self.auto_stepping:
+            print("Automatización detenida por el botón 'Siguiente Paso'.")  # Depuración
+            self.auto_stepping = False
+
         if not self.turing_machine.transitions or not self.turing_machine.tape:
             self.state_label.config(text="Cargue un archivo CSV válido antes de continuar.")
             return
 
-        try:
-            # Ejecutar un bloque usando la posición actual de la cinta y el estado
-            block_to_execute = self.turing_machine.get_next_block()
-            if block_to_execute:
-                self.turing_machine.execute_block(block_to_execute)
+        block = self.turing_machine.get_next_block()
+        if block:
+            self.turing_machine.execute_block(block)
+            self.update_tape_visual(self.turing_machine.tape, self.turing_machine.head_position)
+            self.state_label.config(text=f"Estado: {self.turing_machine.current_state}")
 
-                # Actualizar la cinta visual
-                self.update_tape_visual(
-                    self.turing_machine.tape,
-                    self.turing_machine.head_position,
-                )
-                self.state_label.config(text=f"Estado: {self.turing_machine.current_state}")
-
-                # Verificar si el estado es de detención
-                if self.turing_machine.current_state == "halt":
-                    self.state_label.config(text="La máquina se ha detenido.")
-                    self.step_button.config(state="disabled")
-            else:
-                self.state_label.config(text="No hay transición definida para el estado actual.")
-        except Exception as e:
-            self.state_label.config(text=f"Error ejecutando bloque: {e}")
+            # Deshabilitar botones al alcanzar el estado de detención
+            if self.turing_machine.current_state == "halt":
+                self.state_label.config(text="La máquina se ha detenido.")
+                self.step_button.config(state="disabled")
+                self.auto_button.config(state="disabled")
+                self.fast_button.config(state="disabled")
+                self.auto_stepping = False
+        else:
+            self.state_label.config(text="No hay transición definida para el estado actual.")
+            self.auto_stepping = False
 
     def ensure_infinite_tape(self):
         """Asegura que la cinta sea infinita al expandir con espacios vacíos según sea necesario."""
@@ -205,7 +240,44 @@ class TuringMachineGUI:
             for row in reader:
                 blocks[row[0]] = row[1]
         return blocks
+    
+    def start_auto_step(self):
+        """Inicia el avance automático con velocidad estándar."""
+        if self.auto_stepping:
+            print("La automatización ya está activa. Ajustando velocidad a estándar.")  # Depuración
+            self.auto_speed = 1000  # Ajustar a velocidad estándar
+        else:
+            print("Iniciando avance automático estándar.")  # Depuración
+            self.auto_stepping = True
+            self.auto_speed = 1000  # Velocidad estándar
+            self.perform_auto_step()
 
+    def start_fast_step(self):
+        """Inicia el avance automático con velocidad rápida."""
+        if self.auto_stepping:
+            print("La automatización ya está activa. Ajustando velocidad a rápida.")  # Depuración
+            self.auto_speed = 200  # Ajustar a velocidad rápida
+        else:
+            print("Iniciando avance rápido.")  # Depuración
+            self.auto_stepping = True
+            self.auto_speed = 200  # Velocidad rápida
+            self.perform_auto_step()
+
+    def perform_auto_step(self):
+        """Ejecuta pasos automáticamente mientras esté activo."""
+        if self.auto_stepping:
+            print("Ejecutando paso automático...")  # Depuración
+            self.execute_step(stop_automation=False)  # No detener la automatización
+
+            # Verifica si la máquina se detuvo
+            if self.turing_machine.current_state == "halt":
+                print("La máquina se ha detenido.")  # Depuración
+                self.auto_stepping = False
+                self.auto_button.config(state="disabled")
+                self.fast_button.config(state="disabled")
+            else:
+                # Programa el siguiente paso si no está en halt
+                self.root.after(self.auto_speed, self.perform_auto_step)
 
     def run(self):
         self.root.mainloop()

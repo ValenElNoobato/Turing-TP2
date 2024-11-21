@@ -141,19 +141,15 @@ class TuringMachine:
     def get_next_block(self):
         """Determina el siguiente bloque basado en el estado actual y el símbolo del cabezal."""
         current_symbol = self.tape[self.head_position]
-        transition_key = (self.current_state, current_symbol)
-
         print(f"Evaluando transición: Estado actual = {self.current_state}, Símbolo actual = {current_symbol}")
         
+        transition_key = (self.current_state, current_symbol)
         if transition_key in self.transitions:
             block, next_state = self.transitions[transition_key]
-            print(f"Transición encontrada: Ejecutando bloque '{block}', Nuevo estado = {next_state}")
             self.current_state = next_state  # Actualiza el estado
             return block
         else:
-            print("No se encontró transición. Máquina en estado halt.")
-            self.current_state = "halt"  # Detener si no hay transición definida
-            return None
+            return None  # No hay transición definida
         
     def set_initial_state(self, state):
         self.initial_state = state
