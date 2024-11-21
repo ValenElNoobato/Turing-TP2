@@ -45,6 +45,13 @@ class TuringMachine:
     
     def execute_block(self, block):
         """Ejecuta un bloque de construcción."""
+        
+        # Validar si el bloque existe en la tabla de bloques
+        if block not in self.blocks and not block.startswith(("L", "R", "X", "R_", "L_", "S_l", "S_r")):
+            print(f"Error: El bloque '{block}' no está definido en la tabla de bloques.")
+            self.current_state = "halt"
+            return
+        
         if block == "L":  # Mover a la izquierda
             self.head_position -= 1
             if self.head_position < 0:
@@ -54,9 +61,18 @@ class TuringMachine:
             if self.head_position >= len(self.tape):
                 self.tape.append("_")
         elif block.startswith("X"):  # Escritura dinámica
+            # Validar que tenga exactamente un carácter adicional
+            if len(block[1:]) != 1:
+                print(f"Error: El bloque '{block}' debe contener exactamente un carácter adicional.")
+                self.current_state = "halt"
+                return
             self.tape[self.head_position] = block[1:]
         elif block.startswith("R_"):  # Desplazar a la derecha hasta encontrar X
             target = block[2:]
+            if len(target) != 1:
+                print(f"Error: El bloque '{block}' debe contener exactamente un carácter como símbolo objetivo.")
+                self.current_state = "halt"
+                return
             while True:
                 self.execute_block("R")  # Mover a la derecha paso a paso
                 # Si estamos fuera del límite, expandir dinámicamente la cinta
@@ -67,6 +83,10 @@ class TuringMachine:
                     break
         elif block.startswith("L_"):  # Desplazar a la izquierda hasta encontrar X
             target = block[2:]  # Extrae el carácter objetivo
+            if len(target) != 1:
+                print(f"Error: El bloque '{block}' debe contener exactamente un carácter como símbolo objetivo.")
+                self.current_state = "halt"
+                return
             while True:
                 # Reutilizar el bloque básico "L"
                 self.execute_block("L")

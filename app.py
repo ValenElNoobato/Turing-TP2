@@ -56,7 +56,7 @@ class TuringMachineGUI:
         )
         if file_path:
             try:
-                # Cargar datos desde el archivo CSV
+                # Cargar datos desde el archivo CSV con validaciones
                 self.transitions, self.tape, self.head_position = self.load_csv_as_dict(file_path)
                 self.current_state = "start"  # Estado inicial predeterminado
                 self.halted = False  # Reiniciar estado de detención
@@ -76,39 +76,59 @@ class TuringMachineGUI:
                 self.fast_button.config(state="normal")
 
                 self.state_label.config(text="Archivo cargado con éxito. ¡Listo para ejecutar!")
+            except ValueError as e:
+                self.state_label.config(text=f"Error al cargar archivo: {str(e)}")
             except Exception as e:
-                self.state_label.config(text=f"Error al cargar CSV: {str(e)}")
+                self.state_label.config(text=f"Error inesperado: {str(e)}")
 
     def load_csv_as_dict(self, filepath):
-        """Carga un archivo CSV como un diccionario y extrae la cinta inicial si está definida."""
+        """Carga un archivo CSV como un diccionario y realiza validaciones."""
         transitions = {}
         tape = []  # Por defecto, cinta vacía
-        initial_symbol = None
+        initial_symbol = None  # Símbolo inicial basado en la primera transición desde 'start'
+        has_start_state = False
+        has_tape = False
 
         with open(filepath, mode="r", newline="") as file:
             reader = csv.reader(file)
-            for row in reader:
+            for row_index, row in enumerate(reader):
+                # Validar la cinta inicial
                 if row[0] == "tape":
-                    # Leer la cinta inicial
-                    tape = list(row[1])
-                elif not initial_symbol and row[0] != "tape":
-                    # Establecer el símbolo inicial solo si es la primera transición
-                    initial_symbol = row[1]
-                    # Procesar como transición
+                    has_tape = True
+                    tape = list(row[1]) if len(row) > 1 and row[1].strip() else []
+                    if not tape:
+                        raise ValueError(f"La cinta inicial en la línea {row_index + 1} está vacía.")
+                
+                # Validar transiciones
+                elif len(row) == 4:  # Debe tener exactamente 4 columnas
                     key = (row[0], row[1])
                     value = (row[2], row[3])
+                    if not row[0].strip() or not row[1].strip():
+                        raise ValueError(f"Estado o símbolo vacío en la línea {row_index + 1}.")
+                    if row[0] == "start":
+                        has_start_state = True
+                        # Establecer el símbolo inicial si es la primera transición desde 'start'
+                        if initial_symbol is None:
+                            initial_symbol = row[1]
                     transitions[key] = value
+                
+                # Formato inválido
                 else:
-                    # Leer las transiciones restantes
-                    key = (row[0], row[1])
-                    value = (row[2], row[3])
-                    transitions[key] = value
-
-        # Imprimir las transiciones cargadas para verificar
-        print("Transiciones cargadas:", transitions)
+                    raise ValueError(f"Formato inválido en la línea {row_index + 1}: {row}")
+        
+        # Validar que haya al menos una línea de cinta
+        if not has_tape:
+            raise ValueError("No se encontró una línea de cinta ('tape') en el archivo CSV.")
+        
+        # Validar que haya al menos una transición desde el estado "start"
+        if not has_start_state:
+            raise ValueError("No hay transiciones definidas desde el estado inicial 'start'.")
 
         # Determinar la posición inicial del cabezal
-        head_position = tape.index(initial_symbol) if initial_symbol in tape else 0
+        if initial_symbol not in tape:
+            raise ValueError(f"El símbolo inicial '{initial_symbol}' definido en 'start' no se encuentra en la cinta.")
+        head_position = tape.index(initial_symbol)
+
         return transitions, tape, head_position
 
     def update_ui_after_load(self):
@@ -163,7 +183,7 @@ class TuringMachineGUI:
 
     def execute_step(self, stop_automation=True):
         """Ejecuta un paso de la máquina de Turing y detiene la automatización si se indica."""
-        # Detener el avance automático solo si se activa explícitamente
+        # Detener el avance automático si está activo
         if stop_automation and self.auto_stepping:
             print("Automatización detenida por el botón 'Siguiente Paso'.")  # Depuración
             self.auto_stepping = False
@@ -174,17 +194,22 @@ class TuringMachineGUI:
 
         block = self.turing_machine.get_next_block()
         if block:
+            # Ejecutar el bloque
             self.turing_machine.execute_block(block)
             self.update_tape_visual(self.turing_machine.tape, self.turing_machine.head_position)
-            self.state_label.config(text=f"Estado: {self.turing_machine.current_state}")
 
-            # Deshabilitar botones al alcanzar el estado de detención
+            # Verificar si la máquina llegó al estado de detención
             if self.turing_machine.current_state == "halt":
-                self.state_label.config(text="La máquina se ha detenido.")
+                self.state_label.config(
+                    text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}. La máquina se ha detenido."
+                )
                 self.step_button.config(state="disabled")
                 self.auto_button.config(state="disabled")
                 self.fast_button.config(state="disabled")
                 self.auto_stepping = False
+            else:
+                # Actualizar el texto del estado y bloque ejecutado
+                self.state_label.config(text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}")
         else:
             self.state_label.config(text="No hay transición definida para el estado actual.")
             self.auto_stepping = False
