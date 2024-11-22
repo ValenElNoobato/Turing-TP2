@@ -66,6 +66,8 @@ class TuringMachineGUI:
                 self.turing_machine.set_tape(self.tape)
                 self.turing_machine.set_transitions(self.transitions)
                 self.turing_machine.head_position = self.head_position
+                self.turing_machine.error = False
+                self.turing_machine.errorMensage = ""
 
                 # Actualizar la interfaz
                 self.update_ui_after_load()
@@ -199,19 +201,31 @@ class TuringMachineGUI:
             self.update_tape_visual(self.turing_machine.tape, self.turing_machine.head_position)
 
             # Verificar si la máquina llegó al estado de detención
-            if self.turing_machine.current_state == "halt":
+            if self.turing_machine.error == True:
                 self.state_label.config(
-                    text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}. La máquina se ha detenido."
+                    text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}. {self.turing_machine.errorMensage}"
                 )
                 self.step_button.config(state="disabled")
                 self.auto_button.config(state="disabled")
                 self.fast_button.config(state="disabled")
                 self.auto_stepping = False
             else:
-                # Actualizar el texto del estado y bloque ejecutado
-                self.state_label.config(text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}")
+                if self.turing_machine.current_state == "halt":
+                    self.state_label.config(
+                        text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}. La máquina se ha detenido."
+                    )
+                    self.step_button.config(state="disabled")
+                    self.auto_button.config(state="disabled")
+                    self.fast_button.config(state="disabled")
+                    self.auto_stepping = False
+                else:
+                    # Actualizar el texto del estado y bloque ejecutado
+                    self.state_label.config(text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}")
         else:
-            self.state_label.config(text="No hay transición definida para el estado actual.")
+            self.state_label.config(text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}. No hay transición definida para el estado actual.")
+            self.step_button.config(state="disabled")
+            self.auto_button.config(state="disabled")
+            self.fast_button.config(state="disabled")
             self.auto_stepping = False
 
     def ensure_infinite_tape(self):

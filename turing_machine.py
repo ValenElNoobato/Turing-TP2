@@ -9,6 +9,8 @@ class TuringMachine:
         self.transitions = {}  # Transiciones
         self.blocks = {}  # Bloques de construcción
         self.tape_update_callback = None  # Callback para actualizar la cinta
+        self.error = False
+        self.errorMensage = ""
 
     def load_transition_table(self, filename):
         transition_table = {}
@@ -48,7 +50,7 @@ class TuringMachine:
         
         # Validar si el bloque existe en la tabla de bloques
         if block not in self.blocks and not block.startswith(("L", "R", "X", "R_", "L_", "S_l", "S_r")):
-            print(f"Error: El bloque '{block}' no está definido en la tabla de bloques.")
+            self.errorMensage = f"Error: El bloque '{block}' no está definido en la tabla de bloques."
             self.current_state = "halt"
             return
         
@@ -63,42 +65,70 @@ class TuringMachine:
         elif block.startswith("X"):  # Escritura dinámica
             # Validar que tenga exactamente un carácter adicional
             if len(block[1:]) != 1:
-                print(f"Error: El bloque '{block}' debe contener exactamente un carácter adicional.")
+                self.errorMensage = f"Error: El bloque '{block}' debe contener exactamente un carácter adicional."
                 self.current_state = "halt"
+                self.error = True
                 return
             self.tape[self.head_position] = block[1:]
         elif block.startswith("R_"):  # Desplazar a la derecha hasta encontrar X
             target = block[2:]
             if len(target) != 1:
-                print(f"Error: El bloque '{block}' debe contener exactamente un carácter como símbolo objetivo.")
+                self.errorMensage = f"Error: El bloque '{block}' debe contener exactamente un carácter como símbolo objetivo."
                 self.current_state = "halt"
+                self.error = True
                 return
-            while True:
-                self.execute_block("R")  # Mover a la derecha paso a paso
-                # Si estamos fuera del límite, expandir dinámicamente la cinta
+            found = False  # Bandera para verificar si el símbolo fue encontrado
+            while not found:
+                # Validar si el símbolo objetivo está presente desde la posición actual
+                if target != "_" and target not in self.tape[self.head_position:]:
+                    self.errorMensage = f"Error: El símbolo '{target}' no se encontró en la cinta hacia la derecha."
+                    self.current_state = "halt"
+                    self.error = True
+                    return
+                self.head_position += 1
+                # Expandir la cinta si el cabezal está fuera de los límites
                 if self.head_position >= len(self.tape):
-                    self.tape.append("_")
+                    if target == "_":  # Caso especial: buscar un espacio vacío
+                        self.tape.append("_")
+                        found = True
+                    else:
+                        self.tape.append("_")
                 # Detenerse si encuentra el símbolo objetivo
                 if self.tape[self.head_position] == target:
-                    break
+                    found = True
         elif block.startswith("L_"):  # Desplazar a la izquierda hasta encontrar X
-            target = block[2:]  # Extrae el carácter objetivo
+            target = block[2:]
             if len(target) != 1:
-                print(f"Error: El bloque '{block}' debe contener exactamente un carácter como símbolo objetivo.")
+                self.errorMensage = f"Error: El bloque '{block}' debe contener exactamente un carácter como símbolo objetivo."
                 self.current_state = "halt"
+                self.error = True
                 return
-            while True:
-                # Reutilizar el bloque básico "L"
-                self.execute_block("L")
-                
-                # Si estamos fuera del límite izquierdo, expandir la cinta
-                if self.head_position <= 0:
-                    self.tape.insert(0, "_")  # Añadir un espacio vacío al inicio
-                    self.head_position = 0  # Reposicionar el cabezal al nuevo espacio vacío
-                    
+            found = False  # Bandera para verificar si el símbolo fue encontrado
+            while not found:
+                # Validar si el símbolo objetivo está presente desde la posición actual
+                if target != "_" and target not in self.tape[:self.head_position + 1]:
+                    self.errorMensage = f"Error: El símbolo '{target}' no se encontró en la cinta hacia la izquierda."
+                    self.current_state = "halt"
+                    self.error = True
+                    return
+                self.head_position -= 1
+                # Expandir la cinta si el cabezal está fuera de los límites
+                if self.head_position < 0:
+                    if target == "_":  # Caso especial: buscar un espacio vacío
+                        self.tape.insert(0, "_")
+                        self.head_position = 0
+                        found = True
+                    else:
+                        self.tape.insert(0, "_")
+                        self.head_position = 0
                 # Detenerse si encuentra el símbolo objetivo
                 if self.tape[self.head_position] == target:
-                    break
+                    found = True
+            if not found:
+                self.errorMensage = f"Error: El símbolo '{target}' no se encontró en la cinta hacia la izquierda."
+                self.error = True
+                self.current_state = "halt"
+
         elif block == "S_l":  # Desplazar a la izquierda los elementos a la derecha del puntero
             for i in range(self.head_position, len(self.tape) - 1):
                 self.tape[i] = self.tape[i + 1]
@@ -139,24 +169,6 @@ class TuringMachine:
             for i in range(end - 1, start, -1):
                 self.tape[i] = self.tape[i - 1]
             self.tape[start + 1] = "_"
-
-    def step(self):
-        if self.state == "halt":
-            print("La máquina ha llegado al estado de parada y se detiene.")
-            return False  # Detener ejecución si llega al estado 'halt'
-        
-        current_symbol = self.tape[self.head_position]
-        print(f"Current State: {self.state}, Current Symbol: '{current_symbol}'")
-        
-        if (self.state, current_symbol) in self.transition_table:
-            construction_block, next_state = self.transition_table[(self.state, current_symbol)]
-            self.execute_block(construction_block)
-            self.state = next_state
-            self.display_tape()
-            return True
-        else:
-            print(f"No hay transición definida para el estado '{self.state}' y símbolo '{current_symbol}'. La máquina se detiene.")
-            return False
         
     def get_next_block(self):
         """Determina el siguiente bloque basado en el estado actual y el símbolo del cabezal."""
