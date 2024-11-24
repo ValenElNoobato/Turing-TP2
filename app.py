@@ -92,7 +92,7 @@ class TuringMachineGUI:
         transitions = {}
         tape = []  # Por defecto, cinta vacía
         initial_state = None  # Estado inicial predeterminado
-        head_position = 0  # Posición inicial del cabezal
+        head_position = None  # Posición inicial del cabezal
 
         with open(filepath, mode="r", newline="") as file:
             reader = csv.reader(file)
@@ -109,13 +109,14 @@ class TuringMachineGUI:
                         raise ValueError(f"El estado inicial está mal definido en la línea {row_index + 1}.")
                     initial_state = row[1].strip()
 
-                # Leer posición inicial del cabezal
                 elif row[0] == "head_position":
                     if len(row) != 2 or not row[1].isdigit():
                         raise ValueError(f"La posición inicial del cabezal está mal definida en la línea {row_index + 1}.")
                     head_position = int(row[1])
+                    # Validar que la posición sea válida
                     if head_position < 0 or head_position >= len(tape):
                         raise ValueError(f"La posición inicial del cabezal '{head_position}' está fuera de los límites de la cinta.")
+                    print("head_position: " + head_position.__str__())
 
                 # Validar transiciones
                 elif len(row) == 4:  # Debe tener exactamente 4 columnas
@@ -136,8 +137,8 @@ class TuringMachineGUI:
             raise ValueError("No se encontró una línea de cinta ('tape') en el archivo CSV.")
         if not initial_state:
             raise ValueError("No se encontró el estado inicial ('initial_state') en el archivo CSV.")
-        if not head_position:
-            raise ValueError("No se encontró la posicion inicial del cabezal ('head_position') en el archivo CSV.")
+        if len(str(head_position)) == 0 or head_position == None:
+            raise ValueError("No se encontró la posición inicial del cabezal ('head_position') en el archivo CSV.")
         if not transitions:
             raise ValueError("No se encontró transiciones en el archivo CSV.")
 
@@ -288,22 +289,22 @@ class TuringMachineGUI:
         """Inicia el avance automático con velocidad estándar."""
         if self.auto_stepping:
             print("La automatización ya está activa. Ajustando velocidad a estándar.")  # Depuración
-            self.auto_speed = 1000  # Ajustar a velocidad estándar
+            self.auto_speed = 300  # Ajustar a velocidad estándar
         else:
             print("Iniciando avance automático estándar.")  # Depuración
             self.auto_stepping = True
-            self.auto_speed = 1000  # Velocidad estándar
+            self.auto_speed = 300  # Velocidad estándar
             self.perform_auto_step()
 
     def start_fast_step(self):
         """Inicia el avance automático con velocidad rápida."""
         if self.auto_stepping:
             print("La automatización ya está activa. Ajustando velocidad a rápida.")  # Depuración
-            self.auto_speed = 200  # Ajustar a velocidad rápida
+            self.auto_speed = 50  # Ajustar a velocidad rápida
         else:
             print("Iniciando avance rápido.")  # Depuración
             self.auto_stepping = True
-            self.auto_speed = 200  # Velocidad rápida
+            self.auto_speed = 50  # Velocidad rápida
             self.perform_auto_step()
 
     def perform_auto_step(self):

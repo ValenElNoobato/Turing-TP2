@@ -1,9 +1,0 @@
-tape,0123456
-initial_state,state0
-head_position,3
-state0,3,R__,state1
-state1,_,R__,state2
-state2,_,L__,state3
-state3,_,L__,state4
-state4,_,S_l,state5
-state5,0,R_3,halt
