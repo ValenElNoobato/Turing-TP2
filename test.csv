@@ -1,7 +1,0 @@
-tape,0123456
-start,3,R__,state0
-state0,_,R__,state1
-state1,_,L__,state2
-state2,_,L__,state3
-state3,_,R_3,state4
-state4,_,R_9,halt

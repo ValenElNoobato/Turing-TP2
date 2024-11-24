@@ -1,0 +1,3 @@
+initial_state,state0
+head_position,1
+state0,1,R,halt

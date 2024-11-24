@@ -185,11 +185,10 @@ class TuringMachine:
         
     def set_initial_state(self, state):
         self.initial_state = state
-        self.current_state = state  # El estado actual comienza igual que el inicial
+        self.current_state = state 
 
     def set_tape(self, tape):
         self.tape = tape
-        self.head_position = 0  # Reinicia la posición del cabezal
 
     def set_transitions(self, transitions):
         self.transitions = transitions

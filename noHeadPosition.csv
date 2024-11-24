@@ -1,0 +1,3 @@
+tape,123
+initial_state,state0
+state0,1,R,halt

@@ -1,0 +1,5 @@
+tape,111
+initial_state,state0
+head_position,1
+state0,1,,state1
+state1,1,X1,halt

@@ -57,27 +57,31 @@ class TuringMachineGUI:
         if file_path:
             try:
                 # Cargar datos desde el archivo CSV con validaciones
-                self.transitions, self.tape, self.head_position = self.load_csv_as_dict(file_path)
-                self.current_state = "start"  # Estado inicial predeterminado
-                self.halted = False  # Reiniciar estado de detención
+                transitions, tape, initial_state, head_position = self.load_csv_as_dict(file_path)
 
                 # Sincronizar con la máquina de Turing
-                self.turing_machine.set_initial_state(self.current_state)
-                self.turing_machine.set_tape(self.tape)
-                self.turing_machine.set_transitions(self.transitions)
-                self.turing_machine.head_position = self.head_position
-                self.turing_machine.error = False
-                self.turing_machine.errorMensage = ""
+                self.turing_machine.set_initial_state(initial_state)
+                self.turing_machine.set_tape(tape)
+                self.turing_machine.set_transitions(transitions)
+                self.turing_machine.head_position = head_position
+
+                # Actualizar el atributo local de la cinta
+                self.tape = tape
+                self.head_position = head_position
+                self.current_state = initial_state
 
                 # Actualizar la interfaz
                 self.update_ui_after_load()
 
-                # Habilitar todos los botones
+                # Habilitar los botones
                 self.step_button.config(state="normal")
                 self.auto_button.config(state="normal")
                 self.fast_button.config(state="normal")
-
                 self.state_label.config(text="Archivo cargado con éxito. ¡Listo para ejecutar!")
+
+                self.turing_machine.error = False
+                self.turing_machine.errorMensage = ""
+
             except ValueError as e:
                 self.state_label.config(text=f"Error al cargar archivo: {str(e)}")
             except Exception as e:
@@ -87,51 +91,57 @@ class TuringMachineGUI:
         """Carga un archivo CSV como un diccionario y realiza validaciones."""
         transitions = {}
         tape = []  # Por defecto, cinta vacía
-        initial_symbol = None  # Símbolo inicial basado en la primera transición desde 'start'
-        has_start_state = False
-        has_tape = False
+        initial_state = None  # Estado inicial predeterminado
+        head_position = 0  # Posición inicial del cabezal
 
         with open(filepath, mode="r", newline="") as file:
             reader = csv.reader(file)
             for row_index, row in enumerate(reader):
                 # Validar la cinta inicial
                 if row[0] == "tape":
-                    has_tape = True
                     tape = list(row[1]) if len(row) > 1 and row[1].strip() else []
                     if not tape:
                         raise ValueError(f"La cinta inicial en la línea {row_index + 1} está vacía.")
-                
+
+                # Leer estado inicial
+                elif row[0] == "initial_state":
+                    if len(row) != 2 or not row[1].strip():
+                        raise ValueError(f"El estado inicial está mal definido en la línea {row_index + 1}.")
+                    initial_state = row[1].strip()
+
+                # Leer posición inicial del cabezal
+                elif row[0] == "head_position":
+                    if len(row) != 2 or not row[1].isdigit():
+                        raise ValueError(f"La posición inicial del cabezal está mal definida en la línea {row_index + 1}.")
+                    head_position = int(row[1])
+                    if head_position < 0 or head_position >= len(tape):
+                        raise ValueError(f"La posición inicial del cabezal '{head_position}' está fuera de los límites de la cinta.")
+
                 # Validar transiciones
                 elif len(row) == 4:  # Debe tener exactamente 4 columnas
                     key = (row[0], row[1])
+                    print("Key:" + key.__str__())
                     value = (row[2], row[3])
-                    if not row[0].strip() or not row[1].strip():
-                        raise ValueError(f"Estado o símbolo vacío en la línea {row_index + 1}.")
-                    if row[0] == "start":
-                        has_start_state = True
-                        # Establecer el símbolo inicial si es la primera transición desde 'start'
-                        if initial_symbol is None:
-                            initial_symbol = row[1]
+                    print("Value:" + value.__str__())
                     transitions[key] = value
-                
+                    if not row[0].strip() or not row[1].strip() or not row[2].strip() or not row[3].strip():
+                        raise ValueError(f"Estado o símbolo vacío en la línea {row_index + 1}.")
+
                 # Formato inválido
                 else:
                     raise ValueError(f"Formato inválido en la línea {row_index + 1}: {row}")
-        
-        # Validar que haya al menos una línea de cinta
-        if not has_tape:
+
+        # Validaciones finales
+        if not tape:
             raise ValueError("No se encontró una línea de cinta ('tape') en el archivo CSV.")
-        
-        # Validar que haya al menos una transición desde el estado "start"
-        if not has_start_state:
-            raise ValueError("No hay transiciones definidas desde el estado inicial 'start'.")
+        if not initial_state:
+            raise ValueError("No se encontró el estado inicial ('initial_state') en el archivo CSV.")
+        if not head_position:
+            raise ValueError("No se encontró la posicion inicial del cabezal ('head_position') en el archivo CSV.")
+        if not transitions:
+            raise ValueError("No se encontró transiciones en el archivo CSV.")
 
-        # Determinar la posición inicial del cabezal
-        if initial_symbol not in tape:
-            raise ValueError(f"El símbolo inicial '{initial_symbol}' definido en 'start' no se encuentra en la cinta.")
-        head_position = tape.index(initial_symbol)
-
-        return transitions, tape, head_position
+        return transitions, tape, initial_state, head_position
 
     def update_ui_after_load(self):
         """Actualiza la interfaz después de cargar un archivo CSV."""
@@ -161,22 +171,16 @@ class TuringMachineGUI:
 
         # Crear etiquetas para cada elemento de la cinta
         for i, symbol in enumerate(self.tape):
-            label = tk.Label(self.tape_frame, text=symbol, font=("Arial", 16), width=2, borderwidth=2, relief="solid")
-            label.grid(row=0, column=i, padx=2, pady=10)  # Espaciado consistente
+            bg_color = "yellow" if i == self.head_position else "white"
+            label = tk.Label(self.tape_frame, text=symbol, font=("Arial", 16), width=2, borderwidth=2, relief="solid", bg=bg_color)
+            label.grid(row=0, column=i, padx=2, pady=10)
             self.tape_labels.append(label)
 
-        # Eliminar cualquier configuración previa de expansión
-        for i in range(len(self.tape)):
-            self.tape_frame.grid_columnconfigure(i, weight=0)  # No permitir que las columnas se expandan
-
         # Centrar la cinta en la ventana
-        self.root.grid_columnconfigure(0, weight=1)  # Centrar el frame principal
+        self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_rowconfigure(0, weight=1)
 
-        # Actualizar la posición inicial del cabezal
-        self.update_head_position()
-
-        # Actualizar o crear la etiqueta del estado
+        # Actualizar el texto del estado inicial
         if not hasattr(self, 'state_label'):
             self.state_label = tk.Label(self.root, text=f"Estado: {self.current_state}", font=("Arial", 14), anchor="center")
             self.state_label.grid(row=3, column=1, sticky="ew", pady=10)

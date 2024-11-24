@@ -1,0 +1,4 @@
+tape,123
+initial_state,state0
+head_position,
+state0,1,R,halt
