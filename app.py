@@ -30,21 +30,33 @@ class TuringMachineGUI:
         self.tape_labels = []
         self.create_tape_display()
 
+        # Crear un nuevo frame para los botones
+        self.bottom_frame = tk.Frame(self.root)
+        self.bottom_frame.grid(row=2, column=0, sticky="s")  # Asegurar que ocupe toda la celda del grid
+
         # Botón para avanzar
-        self.step_button = tk.Button(self.root, text="Siguiente Paso", command=self.execute_step)
+        self.step_button = tk.Button(self.bottom_frame, text="Siguiente Paso", command=self.execute_step)
         self.step_button.grid(row=2, column=0, sticky="ew", pady=10)  # Expandirse horizontalmente
 
         # Botón para avanzar automáticamente
-        self.auto_button = tk.Button(self.root, text="Avanzar Automáticamente", command=self.start_auto_step)
+        self.auto_button = tk.Button(self.bottom_frame, text="Avanzar Automáticamente", command=self.start_auto_step)
         self.auto_button.grid(row=2, column=1, sticky="ew", pady=10)
 
         # Botón para avanzar rápidamente
-        self.fast_button = tk.Button(self.root, text="Avanzar Rápido", command=self.start_fast_step)
+        self.fast_button = tk.Button(self.bottom_frame, text="Avanzar Automáticamente Rápido", command=self.start_fast_step)
         self.fast_button.grid(row=2, column=3, sticky="ew", pady=10)
 
+        # Botón para avanzar muy rápidamente
+        self.fast_button = tk.Button(self.bottom_frame, text="Avanzar Automáticamente Muy Rápido", command=self.start_very_fast_step)
+        self.fast_button.grid(row=2, column=4, sticky="ew", pady=10)
+
+        # Crear un nuevo frame para el boton del CSV
+        self.middle_frame = tk.Frame(self.root)
+        self.middle_frame.grid(row=1, column=0, sticky="s")  # Asegurar que ocupe toda la celda del grid
+
         # Botón para cargar un archivo CSV
-        self.load_csv_button = tk.Button(self.root, text="Cargar CSV de Transiciones", command=self.load_csv)
-        self.load_csv_button.grid(row=1, column=1, pady=10, sticky="ew")
+        self.load_csv_button = tk.Button(self.middle_frame, text="Cargar CSV de Transiciones", command=self.load_csv)
+        self.load_csv_button.grid(row=1, column=0, pady=10, sticky="ew")
 
         self.turing_machine.set_tape_update_callback(self.update_tape_visual)
 
@@ -168,12 +180,24 @@ class TuringMachineGUI:
         """Crea o actualiza la representación visual de la cinta."""
         # Crear un nuevo frame para la cinta
         self.tape_frame = tk.Frame(self.root)
-        self.tape_frame.grid(row=0, column=1, sticky="nsew")  # Asegurar que ocupe toda la celda del grid
+        self.tape_frame.grid(row=0, column=0, sticky="nsew")  # Asegurar que ocupe toda la celda del grid
+
+        # Crear el canvas y la barra de desplazamiento
+        self.canvas = tk.Canvas(self.tape_frame, height=50)
+        self.scrollbar = tk.Scrollbar(self.tape_frame, orient="horizontal", command=self.canvas.xview)
+        self.canvas.configure(xscrollcommand=self.scrollbar.set)
+
+        self.scrollbar.pack(side="top", fill="x")
+        self.canvas.pack(side="top", fill="both", expand=True)
+
+        # Crear un frame interno para la cinta
+        self.cinta_container = tk.Frame(self.canvas)
+        self.canvas.create_window((0, 0), window=self.cinta_container, anchor="nw")
 
         # Crear etiquetas para cada elemento de la cinta
         for i, symbol in enumerate(self.tape):
             bg_color = "yellow" if i == self.head_position else "white"
-            label = tk.Label(self.tape_frame, text=symbol, font=("Arial", 16), width=2, borderwidth=2, relief="solid", bg=bg_color)
+            label = tk.Label(self.cinta_container, text=symbol, font=("Arial", 16), width=2, borderwidth=2, relief="solid", bg=bg_color)
             label.grid(row=0, column=i, padx=2, pady=10)
             self.tape_labels.append(label)
 
@@ -181,10 +205,14 @@ class TuringMachineGUI:
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_rowconfigure(0, weight=1)
 
+        # Actualizar el tamaño del canvas
+        self.cinta_container.update_idletasks()
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
         # Actualizar el texto del estado inicial
         if not hasattr(self, 'state_label'):
             self.state_label = tk.Label(self.root, text=f"Estado: {self.current_state}", font=("Arial", 14), anchor="center")
-            self.state_label.grid(row=3, column=1, sticky="ew", pady=10)
+            self.state_label.grid(row=3, column=0, sticky="ew", pady=10)
         else:
             self.state_label.config(text=f"Estado: {self.current_state}")
 
@@ -205,32 +233,24 @@ class TuringMachineGUI:
             self.turing_machine.execute_block(block)
             self.update_tape_visual(self.turing_machine.tape, self.turing_machine.head_position)
 
-            # Verificar si la máquina llegó al estado de detención
-            if self.turing_machine.error == True:
-                self.state_label.config(
-                    text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}. {self.turing_machine.errorMensage}"
-                )
-                self.step_button.config(state="disabled")
-                self.auto_button.config(state="disabled")
-                self.fast_button.config(state="disabled")
+            # Verificar si la máquina llegó al estado de pausa
+            if self.turing_machine.errorMensage == "La automatización se pausó por un estado nombrado 'pause'.":
+                self.state_label.config(text=self.turing_machine.errorMensage)
                 self.auto_stepping = False
+                print("La automatización se pausó correctamente.")  # Depuración
             else:
                 if self.turing_machine.current_state == "halt":
                     self.state_label.config(
                         text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}. La máquina se ha detenido."
                     )
+                    self.auto_stepping = False
                     self.step_button.config(state="disabled")
                     self.auto_button.config(state="disabled")
                     self.fast_button.config(state="disabled")
-                    self.auto_stepping = False
                 else:
-                    # Actualizar el texto del estado y bloque ejecutado
                     self.state_label.config(text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}")
         else:
-            self.state_label.config(text=f"Estado: {self.turing_machine.current_state}, Bloque: {block}. No hay transición definida para el estado actual.")
-            self.step_button.config(state="disabled")
-            self.auto_button.config(state="disabled")
-            self.fast_button.config(state="disabled")
+            self.state_label.config(text=f"No hay transición definida para el estado actual.")
             self.auto_stepping = False
 
     def ensure_infinite_tape(self):
@@ -265,9 +285,13 @@ class TuringMachineGUI:
         # Crear etiquetas para la cinta actualizada
         for i, symbol in enumerate(tape):
             bg_color = "yellow" if i == head_position else "white"
-            label = tk.Label(self.tape_frame, text=symbol, font=("Arial", 16), width=2, borderwidth=2, relief="solid", bg=bg_color)
+            label = tk.Label(self.cinta_container, text=symbol, font=("Arial", 16), width=2, borderwidth=2, relief="solid", bg=bg_color)
             label.grid(row=0, column=i, padx=2, pady=2)
             self.tape_labels.append(label)
+
+        # Actualizar el tamaño del canvas
+        self.cinta_container.update_idletasks()
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
     def update_head_position(self):
         """Destaca la posición del cabezal en la cinta."""
@@ -292,6 +316,7 @@ class TuringMachineGUI:
             self.auto_speed = 300  # Ajustar a velocidad estándar
         else:
             print("Iniciando avance automático estándar.")  # Depuración
+            self.turing_machine.errorMensage = ""  # Limpiar cualquier mensaje de error previo
             self.auto_stepping = True
             self.auto_speed = 300  # Velocidad estándar
             self.perform_auto_step()
@@ -300,11 +325,24 @@ class TuringMachineGUI:
         """Inicia el avance automático con velocidad rápida."""
         if self.auto_stepping:
             print("La automatización ya está activa. Ajustando velocidad a rápida.")  # Depuración
-            self.auto_speed = 50  # Ajustar a velocidad rápida
+            self.auto_speed = 100  # Ajustar a velocidad rápida
         else:
             print("Iniciando avance rápido.")  # Depuración
+            self.turing_machine.errorMensage = ""  # Limpiar cualquier mensaje de error previo
             self.auto_stepping = True
-            self.auto_speed = 50  # Velocidad rápida
+            self.auto_speed = 100  # Velocidad rápida
+            self.perform_auto_step()
+
+    def start_very_fast_step(self):
+        """Inicia el avance automático con velocidad rápida."""
+        if self.auto_stepping:
+            print("La automatización ya está activa. Ajustando velocidad a rápida.")  # Depuración
+            self.auto_speed = 5  # Ajustar a velocidad rápida
+        else:
+            print("Iniciando avance rápido.")  # Depuración
+            self.turing_machine.errorMensage = ""  # Limpiar cualquier mensaje de error previo
+            self.auto_stepping = True
+            self.auto_speed = 5  # Velocidad rápida
             self.perform_auto_step()
 
     def perform_auto_step(self):
@@ -313,7 +351,12 @@ class TuringMachineGUI:
             print("Ejecutando paso automático...")  # Depuración
             self.execute_step(stop_automation=False)  # No detener la automatización
 
-            # Verifica si la máquina se detuvo
+            # Verifica si la automatización debe pausarse
+            if self.turing_machine.errorMensage == "La automatización se pausó por un estado nombrado 'pause'.":
+                print("La automatización fue pausada.")  # Depuración
+                self.auto_stepping = False
+                return
+
             if self.turing_machine.current_state == "halt":
                 print("La máquina se ha detenido.")  # Depuración
                 self.auto_stepping = False

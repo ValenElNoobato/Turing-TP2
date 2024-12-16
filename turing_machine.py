@@ -174,10 +174,16 @@ class TuringMachine:
         """Determina el siguiente bloque basado en el estado actual y el símbolo del cabezal."""
         current_symbol = self.tape[self.head_position]
         print(f"Evaluando transición: Estado actual = {self.current_state}, Símbolo actual = {current_symbol}")
-        
+
         transition_key = (self.current_state, current_symbol)
         if transition_key in self.transitions:
             block, next_state = self.transitions[transition_key]
+            print("next_state: " + next_state)
+            if next_state.startswith("pause"):
+                print(f"Estado especial detectado: {next_state}. Deteniendo la automatización.")
+                self.errorMensage = "La automatización se pausó por un estado nombrado 'pause'."
+            else:
+                self.errorMensage = ""  # Limpiar mensaje de error si no es un estado "pause"
             self.current_state = next_state  # Actualiza el estado
             return block
         else:
